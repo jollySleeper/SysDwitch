@@ -8,6 +8,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -17,7 +21,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.21'
+        go-version: '1.25'
 
     - name: Get version from tag
       id: get_version
@@ -26,12 +30,12 @@ jobs:
         VERSION=${GITHUB_REF#refs/tags/}
         VERSION=${VERSION#v}
         echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "Building version: $VERSION"
+        echo "Building version: $VERSION for ${{ matrix.arch }}"
 
     - name: Build binary
       run: |
         # Build statically linked binary for Linux
-        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+        CGO_ENABLED=0 GOOS=linux GOARCH=${{ matrix.arch }} go build \
           -ldflags="-w -s -X main.version=${{ steps.get_version.outputs.version }} -X main.commit=${GITHUB_SHA} -X main.buildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
           -o service-control-panel \
           ./cmd/service-control/
@@ -44,13 +48,13 @@ jobs:
     - name: Create release archive
       run: |
         # Create a tar.gz archive with the binary
-        tar -czf service-control-panel-${{ steps.get_version.outputs.version }}-linux-amd64.tar.gz service-control-panel
+        tar -czf service-control-panel-${{ steps.get_version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz service-control-panel
         ls -la service-control-panel*
 
     - name: Upload release assets
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          service-control-panel-${{ steps.get_version.outputs.version }}-linux-amd64.tar.gz
+          service-control-panel-${{ steps.get_version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
