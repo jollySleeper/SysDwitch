@@ -1,44 +1,49 @@
 // Service Control Panel JavaScript
 // Dynamic service management functionality
 
-// Load services from API
-async function loadServices() {
+// Refresh services from API (for updates after actions)
+async function refreshServices() {
     try {
         const response = await fetch('/api/services/status');
         const data = await response.json();
         if (data.services) {
-            renderServices(data.services);
+            updateServiceCards(data.services);
         }
     } catch (error) {
-        console.error('Failed to load services:', error);
+        console.error('Failed to refresh services:', error);
     }
 }
 
-// Render services in the grid
-function renderServices(services) {
-    const grid = document.getElementById('services-grid');
-    grid.innerHTML = services.map(service => `
-        <div class="bg-white rounded-lg shadow-md p-6 service-card">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold">${service.name.replace('.service', '')}</h3>
-                <span class="px-2 py-1 rounded-full text-sm ${service.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                    ${service.status}
-                </span>
-            </div>
-            <div class="flex gap-2">
-                <button onclick="controlService('${service.name.replace('.service', '')}', 'start')"
-                        class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors ${service.active ? 'opacity-50 cursor-not-allowed' : ''}"
-                        ${service.active ? 'disabled' : ''}>
-                    Start
-                </button>
-                <button onclick="controlService('${service.name.replace('.service', '')}', 'stop')"
-                        class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition-colors ${!service.active ? 'opacity-50 cursor-not-allowed' : ''}"
-                        ${!service.active ? 'disabled' : ''}>
-                    Stop
-                </button>
-            </div>
-        </div>
-    `).join('');
+// Update service card states after actions
+function updateServiceCards(services) {
+    services.forEach(service => {
+        const serviceName = service.name.replace('.service', '');
+        const card = document.querySelector(`[data-service="${serviceName}"]`);
+        if (card) {
+            // Update status badge
+            const statusBadge = card.querySelector('.status-badge');
+            statusBadge.textContent = service.status;
+            statusBadge.className = `px-2 py-1 rounded-full text-sm status-badge ${
+                service.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+            }`;
+
+            // Update buttons
+            const startBtn = card.querySelector('.start-btn');
+            const stopBtn = card.querySelector('.stop-btn');
+
+            if (service.active) {
+                startBtn.disabled = true;
+                startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                stopBtn.disabled = false;
+                stopBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                startBtn.disabled = false;
+                startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                stopBtn.disabled = true;
+                stopBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+    });
 }
 
 // Control service (start/stop)
@@ -49,7 +54,7 @@ async function controlService(serviceName, action) {
         });
         const result = await response.json();
         if (result.success) {
-            loadServices(); // Refresh the display
+            refreshServices(); // Refresh the display after action
         } else {
             alert('Operation failed: ' + (result.error || 'Unknown error'));
         }
@@ -63,9 +68,25 @@ async function controlService(serviceName, action) {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Service Control Panel loaded');
 
-    // Load services on page load
-    loadServices();
+    // Add data-service attributes to cards for easier targeting
+    document.querySelectorAll('.service-card').forEach((card, index) => {
+        const serviceName = card.querySelector('h3').textContent;
+        card.setAttribute('data-service', serviceName);
 
-    // Refresh every 30 seconds
-    setInterval(loadServices, 30000);
+        // Add classes to buttons for easier targeting
+        const buttons = card.querySelectorAll('button');
+        if (buttons.length >= 2) {
+            buttons[0].classList.add('start-btn');
+            buttons[1].classList.add('stop-btn');
+        }
+
+        // Add class to status badge
+        const statusBadge = card.querySelector('span');
+        if (statusBadge) {
+            statusBadge.classList.add('status-badge');
+        }
+    });
+
+    // Refresh every 30 seconds to show status changes from external sources
+    setInterval(refreshServices, 30000);
 });

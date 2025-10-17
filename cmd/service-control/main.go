@@ -112,7 +112,9 @@ func main() {
 	serviceManager := service.NewServiceManager(config.AllowedServices, logger)
 
 	// Parse templates from embedded files
-	templates, err := template.ParseFS(web.TemplatesFS, "templates/index.html")
+	templates, err := template.New("").Funcs(template.FuncMap{
+		"trimSuffix": strings.TrimSuffix,
+	}).ParseFS(web.TemplatesFS, "templates/index.html")
 	if err != nil {
 		logger.Error("failed to parse embedded templates", "error", err)
 		os.Exit(1)
@@ -134,7 +136,13 @@ func main() {
 			return
 		}
 
-		data := struct{}{}
+		ctx := r.Context()
+		services := serviceManager.GetAllServicesStatus(ctx)
+		data := struct {
+			Services []service.ServiceStatus
+		}{
+			Services: services,
+		}
 
 		if err := templates.ExecuteTemplate(w, "index.html", data); err != nil {
 			logger.Error("template execution error",

@@ -15,14 +15,32 @@
         </header>
 
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="services-grid">
-            <!-- Services will be loaded dynamically by JavaScript -->
-            <div class="col-span-full text-center py-8">
-                <div class="animate-pulse">
-                    <div class="h-4 bg-gray-200 rounded w-1/4 mx-auto mb-4"></div>
-                    <div class="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
+            {{range .Services}}
+            <div class="bg-white rounded-lg shadow-md p-6 service-card" data-service="{{trimSuffix .Name ".service"}}">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">{{trimSuffix .Name ".service"}}</h3>
+                    <span class="px-2 py-1 rounded-full text-sm status-badge {{if .Active}}bg-green-100 text-green-800{{else}}bg-red-100 text-red-800{{end}}">
+                        {{.Status}}
+                    </span>
                 </div>
-                <p class="text-gray-500 mt-4">Loading services...</p>
+                <div class="flex gap-2">
+                    <button onclick="controlService('{{trimSuffix .Name ".service"}}', 'start')"
+                            class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors start-btn {{if .Active}}opacity-50 cursor-not-allowed{{end}}"
+                            {{if .Active}}disabled{{end}}>
+                        Start
+                    </button>
+                    <button onclick="controlService('{{trimSuffix .Name ".service"}}', 'stop')"
+                            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded transition-colors stop-btn {{if not .Active}}opacity-50 cursor-not-allowed{{end}}"
+                            {{if not .Active}}disabled{{end}}>
+                        Stop
+                    </button>
+                </div>
             </div>
+            {{else}}
+            <div class="col-span-full text-center py-8">
+                <p class="text-gray-500">No services configured</p>
+            </div>
+            {{end}}
         </div>
     </div>
 
