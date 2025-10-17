@@ -46,7 +46,13 @@ jobs:
     - name: Strip binary
       run: |
         # Strip debug symbols to reduce binary size
-        strip sysdwitch
+        if [ "${{ matrix.arch }}" = "amd64" ]; then
+          strip sysdwitch
+        else
+          # Install arm64 strip tool if needed and strip
+          sudo apt-get update && sudo apt-get install -y binutils-aarch64-linux-gnu
+          aarch64-linux-gnu-strip sysdwitch
+        fi
         ls -lh sysdwitch
 
     - name: Verify binary
