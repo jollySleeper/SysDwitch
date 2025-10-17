@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required to create releases
 
     strategy:
       matrix:
@@ -53,7 +55,7 @@ jobs:
         ls -la sysdwitch*
 
     - name: Upload release assets
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: |
           sysdwitch-${{ steps.get_version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz
