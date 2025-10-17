@@ -51,7 +51,7 @@ jobs:
     - name: Generate checksums
       run: |
         # Generate SHA256 checksums for verification
-        sha256sum sysdwitch > sysdwitch-${{ steps.get_version.outputs.version }}-linux-${{ matrix.arch }}.sha256
+        sha256sum sysdwitch > sysdwitch-${{ steps.get_version.outputs.version }}-${{ matrix.arch }}-linux.sha256
 
     - name: Create source archives
       if: matrix.arch == 'amd64'  # Only create once, not per architecture
