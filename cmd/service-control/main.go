@@ -2,12 +2,10 @@
 package main
 
 import (
-	"embed"
 	"encoding/json"
 	"errors"
 	"flag"
 	"html/template"
-	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -17,11 +15,8 @@ import (
 
 	"service-control-panel/internal/auth"
 	"service-control-panel/internal/service"
+	"service-control-panel/web"
 )
-
-//go:embed web/templates/*
-//go:embed web/static/*
-var embeddedFiles embed.FS
 
 // AppConfig holds application configuration
 type AppConfig struct {
@@ -116,7 +111,7 @@ func main() {
 	serviceManager := service.NewServiceManager(config.AllowedServices, logger)
 
 	// Parse templates from embedded files
-	templates, err := template.ParseFS(embeddedFiles, "web/templates/*.html")
+	templates, err := template.ParseFS(web.TemplatesFS, "*.html")
 	if err != nil {
 		logger.Error("failed to parse embedded templates", "error", err)
 		os.Exit(1)
@@ -233,13 +228,14 @@ func main() {
 		}
 	}))
 
+	// TODO: Add static file serving when static assets are added
 	// Static files from embedded FS
-	staticFS, err := fs.Sub(embeddedFiles, "web/static")
-	if err != nil {
-		logger.Error("failed to create static file subsystem", "error", err)
-		os.Exit(1)
-	}
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+	// staticFS, err := fs.Sub(embeddedFiles, "web/static")
+	// if err != nil {
+	//     logger.Error("failed to create static file subsystem", "error", err)
+	//     os.Exit(1)
+	// }
+	// mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
 	// Security headers middleware
 	secureMux := securityHeadersMiddleware(mux)
