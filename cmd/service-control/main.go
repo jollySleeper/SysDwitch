@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -111,7 +113,7 @@ func main() {
 		"trimSuffix": strings.TrimSuffix,
 	}).ParseFS(web.TemplatesFS, "templates/index.html")
 	if err != nil {
-		logger.Error("failed to parse embedded templates", "error", err)
+		logger.Error("failed to parse embedded templates", "error", fmt.Errorf("template parsing failed: %w", err))
 		os.Exit(1)
 	}
 
@@ -134,18 +136,19 @@ func main() {
 	// API status route
 	mux.HandleFunc("/api/services/status", authConfig.BasicAuthMiddleware(handler.ServiceStatus))
 
-	// Static files from embedded FS
+	// Static files from embedded FS with caching headers
 	staticFS, err := fs.Sub(web.StaticFS, "static")
 	if err != nil {
 		logger.Error("failed to create static file subsystem", "error", err)
 		os.Exit(1)
 	}
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+	mux.Handle("/static/", http.StripPrefix("/static/", cacheControlMiddleware(http.FileServer(http.FS(staticFS)))))
 
 	// Apply middleware chain
 	muxWithMiddleware := panicRecoveryMiddleware(logger)(
 		requestLoggingMiddleware(logger)(
-			securityHeadersMiddleware(mux)))
+			rateLimitMiddleware(logger)(
+				securityHeadersMiddleware(mux))))
 
 	// Configure HTTP server with timeouts and limits
 	server := &http.Server{
@@ -189,6 +192,109 @@ func main() {
 	}
 
 	logger.Info("server shutdown complete")
+}
+
+// Rate limiter for IP-based rate limiting
+type rateLimiter struct {
+	mu      sync.RWMutex
+	clients map[string]*clientLimiter
+}
+
+type clientLimiter struct {
+	requests []time.Time
+}
+
+func newRateLimiter() *rateLimiter {
+	return &rateLimiter{
+		clients: make(map[string]*clientLimiter),
+	}
+}
+
+// allow checks if a client is allowed to make a request
+func (rl *rateLimiter) allow(clientIP string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	windowStart := now.Add(-time.Minute) // 1 minute window
+
+	// Get or create client limiter
+	client, exists := rl.clients[clientIP]
+	if !exists {
+		client = &clientLimiter{requests: []time.Time{}}
+		rl.clients[clientIP] = client
+	}
+
+	// Remove old requests outside the window
+	validRequests := make([]time.Time, 0, len(client.requests))
+	for _, req := range client.requests {
+		if req.After(windowStart) {
+			validRequests = append(validRequests, req)
+		}
+	}
+	client.requests = validRequests
+
+	// Check rate limit (100 requests per minute)
+	if len(client.requests) >= 100 {
+		return false
+	}
+
+	// Add current request
+	client.requests = append(client.requests, now)
+	return true
+}
+
+// Global rate limiter instance
+var globalRateLimiter = newRateLimiter()
+
+// rateLimitMiddleware implements IP-based rate limiting
+func rateLimitMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			clientIP := getClientIP(r)
+
+			if !globalRateLimiter.allow(clientIP) {
+				logger.Warn("rate limit exceeded",
+					"client_ip", clientIP,
+					"url", r.URL.Path,
+					"method", r.Method)
+				http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// getClientIP extracts the real client IP from the request
+func getClientIP(r *http.Request) string {
+	// Check X-Forwarded-For header first (for proxies/load balancers)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// Take the first IP if multiple are present
+		if idx := strings.Index(xff, ","); idx > 0 {
+			return strings.TrimSpace(xff[:idx])
+		}
+		return strings.TrimSpace(xff)
+	}
+
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+
+	// Fall back to RemoteAddr
+	return strings.Split(r.RemoteAddr, ":")[0]
+}
+
+// cacheControlMiddleware adds appropriate caching headers for static assets
+func cacheControlMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Add aggressive caching for static assets (1 year)
+		// These are embedded in the binary, so they won't change without a redeploy
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // panicRecoveryMiddleware recovers from panics and logs them
