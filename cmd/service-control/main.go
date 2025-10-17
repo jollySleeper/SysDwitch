@@ -2,7 +2,7 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
 	"flag"
 	"html/template"
@@ -10,11 +10,14 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"service-control-panel/internal/auth"
+	"service-control-panel/internal/handlers"
 	"service-control-panel/internal/service"
 	"service-control-panel/web"
 )
@@ -28,14 +31,6 @@ type AppConfig struct {
 	WriteTimeout    time.Duration `json:"write_timeout"`
 	ServiceManager  *service.ServiceManager
 	AuthConfig      *auth.AuthConfig
-}
-
-// APIResponse represents API response structure
-type APIResponse struct {
-	Success  bool                    `json:"success"`
-	Service  *service.ServiceStatus  `json:"service,omitempty"`
-	Services []service.ServiceStatus `json:"services,omitempty"`
-	Error    string                  `json:"error,omitempty"`
 }
 
 // loadConfig loads configuration from environment variables and flags
@@ -124,112 +119,20 @@ func main() {
 	config.AuthConfig = authConfig
 	config.ServiceManager = serviceManager
 
+	// Create handler instance
+	handler := handlers.NewHandler(logger, serviceManager, authConfig, templates)
+
 	// Create HTTP server
 	mux := http.NewServeMux()
 
 	// Dashboard route
-	mux.HandleFunc("/", authConfig.BasicAuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			logger.Warn("invalid method for dashboard",
-				"method", r.Method, "remote_addr", r.RemoteAddr)
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		ctx := r.Context()
-		services := serviceManager.GetAllServicesStatus(ctx)
-		data := struct {
-			Services []service.ServiceStatus
-		}{
-			Services: services,
-		}
-
-		if err := templates.ExecuteTemplate(w, "index.html", data); err != nil {
-			logger.Error("template execution error",
-				"error", err, "template", "index.html", "remote_addr", r.RemoteAddr)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-		}
-	}))
+	mux.HandleFunc("/", authConfig.BasicAuthMiddleware(handler.Dashboard))
 
 	// API routes for service control
-	mux.HandleFunc("/api/services/", authConfig.BasicAuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
-		// Extract service name from URL path
-		path := strings.TrimPrefix(r.URL.Path, "/api/services/")
-		parts := strings.Split(path, "/")
-		if len(parts) < 2 {
-			logger.Warn("invalid API path format",
-				"path", r.URL.Path, "remote_addr", r.RemoteAddr)
-			http.Error(w, `{"error":"Invalid path format. Expected /api/services/{name}/{action}"}`, http.StatusBadRequest)
-			return
-		}
-
-		serviceName := parts[0]
-		if !strings.HasSuffix(serviceName, ".service") {
-			serviceName += ".service"
-		}
-		action := parts[1]
-
-		ctx := r.Context()
-		var response APIResponse
-
-		switch action {
-		case "start":
-			if r.Method != http.MethodPost {
-				logger.Warn("invalid method for service start",
-					"method", r.Method, "service", serviceName, "remote_addr", r.RemoteAddr)
-				response = APIResponse{Success: false, Error: "Method not allowed"}
-				break
-			}
-			service := serviceManager.StartService(ctx, serviceName)
-			response = APIResponse{Success: true, Service: &service}
-			logger.Info("service start requested",
-				"service", serviceName, "status", service.Status, "remote_addr", r.RemoteAddr)
-
-		case "stop":
-			if r.Method != http.MethodPost {
-				logger.Warn("invalid method for service stop",
-					"method", r.Method, "service", serviceName, "remote_addr", r.RemoteAddr)
-				response = APIResponse{Success: false, Error: "Method not allowed"}
-				break
-			}
-			service := serviceManager.StopService(ctx, serviceName)
-			response = APIResponse{Success: true, Service: &service}
-			logger.Info("service stop requested",
-				"service", serviceName, "status", service.Status, "remote_addr", r.RemoteAddr)
-
-		default:
-			logger.Warn("invalid action requested",
-				"action", action, "service", serviceName, "remote_addr", r.RemoteAddr)
-			response = APIResponse{Success: false, Error: "Invalid action. Supported: start, stop"}
-		}
-
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			logger.Error("failed to encode JSON response",
-				"error", err, "remote_addr", r.RemoteAddr)
-		}
-	}))
+	mux.HandleFunc("/api/services/", authConfig.BasicAuthMiddleware(handler.ServiceControl))
 
 	// API status route
-	mux.HandleFunc("/api/services/status", authConfig.BasicAuthMiddleware(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			logger.Warn("invalid method for status endpoint",
-				"method", r.Method, "remote_addr", r.RemoteAddr)
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		ctx := r.Context()
-		services := serviceManager.GetAllServicesStatus(ctx)
-		response := APIResponse{Success: true, Services: services}
-
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			logger.Error("failed to encode JSON response for status",
-				"error", err, "remote_addr", r.RemoteAddr)
-		}
-	}))
+	mux.HandleFunc("/api/services/status", authConfig.BasicAuthMiddleware(handler.ServiceStatus))
 
 	// Static files from embedded FS
 	staticFS, err := fs.Sub(web.StaticFS, "static")
@@ -239,13 +142,15 @@ func main() {
 	}
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
-	// Security headers middleware
-	secureMux := securityHeadersMiddleware(mux)
+	// Apply middleware chain
+	muxWithMiddleware := panicRecoveryMiddleware(logger)(
+		requestLoggingMiddleware(logger)(
+			securityHeadersMiddleware(mux)))
 
 	// Configure HTTP server with timeouts and limits
 	server := &http.Server{
 		Addr:         config.Host + ":" + strconv.Itoa(config.Port),
-		Handler:      secureMux,
+		Handler:      muxWithMiddleware,
 		ReadTimeout:  config.ReadTimeout,
 		WriteTimeout: config.WriteTimeout,
 		IdleTimeout:  60 * time.Second,
@@ -253,15 +158,91 @@ func main() {
 		MaxHeaderBytes: 1 << 20, // 1MB
 	}
 
-	// Start server
-	logger.Info("starting Service Control Panel",
-		"address", server.Addr,
-		"allowed_services", config.AllowedServices)
+	// Channel to listen for interrupt signals
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		logger.Error("server failed to start", "error", err)
+	// Start server in a goroutine
+	go func() {
+		logger.Info("starting Service Control Panel",
+			"address", server.Addr,
+			"allowed_services", config.AllowedServices)
+
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("server failed to start", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	// Wait for interrupt signal
+	<-done
+	logger.Info("received shutdown signal, shutting down gracefully...")
+
+	// Create context with timeout for graceful shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Attempt graceful shutdown
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Error("server forced to shutdown", "error", err)
 		os.Exit(1)
 	}
+
+	logger.Info("server shutdown complete")
+}
+
+// panicRecoveryMiddleware recovers from panics and logs them
+func panicRecoveryMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if err := recover(); err != nil {
+					logger.Error("panic recovered in HTTP handler",
+						"panic", err,
+						"url", r.URL.Path,
+						"method", r.Method,
+						"remote_addr", r.RemoteAddr)
+
+					// Return 500 Internal Server Error
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+				}
+			}()
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// requestLoggingMiddleware logs all HTTP requests
+func requestLoggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+
+			// Create a response writer wrapper to capture status code
+			wrapper := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+
+			next.ServeHTTP(wrapper, r)
+
+			logger.Info("HTTP request",
+				"method", r.Method,
+				"url", r.URL.Path,
+				"status", wrapper.statusCode,
+				"duration", time.Since(start),
+				"remote_addr", r.RemoteAddr,
+				"user_agent", r.Header.Get("User-Agent"))
+		})
+	}
+}
+
+// responseWriter wraps http.ResponseWriter to capture status code
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
 }
 
 // securityHeadersMiddleware adds security headers to all responses
