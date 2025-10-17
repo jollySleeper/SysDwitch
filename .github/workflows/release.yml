@@ -1,4 +1,4 @@
-name: Release
+name: Release Binaries
 
 on:
   push:
@@ -6,57 +6,111 @@ on:
       - 'v*'
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # Required to create releases
-
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
+      contents: write
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.25'
+      - name: Extract build metadata
+        id: meta
+        run: |
+          # Extract module name from go.mod
+          MODULE_NAME=$(grep "^module " go.mod | cut -d' ' -f2)
+          echo "module_name=${MODULE_NAME}" >> $GITHUB_OUTPUT
 
-    - name: Get version from tag
-      id: get_version
-      run: |
-        # Extract version from tag (remove 'v' prefix if present)
-        VERSION=${GITHUB_REF#refs/tags/}
-        VERSION=${VERSION#v}
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "Building version: $VERSION for ${{ matrix.arch }}"
+          # Extract Go version from go.mod
+          GO_VERSION=$(grep "^go " go.mod | cut -d' ' -f2)
+          echo "go_version=${GO_VERSION}" >> $GITHUB_OUTPUT
 
-    - name: Build binary
-      run: |
-        # Build statically linked binary for Linux
-        CGO_ENABLED=0 GOOS=linux GOARCH=${{ matrix.arch }} go build \
-          -ldflags="-w -s -X main.version=${{ steps.get_version.outputs.version }} -X main.commit=${GITHUB_SHA} -X main.buildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-          -o sysdwitch \
-          ./cmd/sysdwitch/
+          echo "📦 Module: ${MODULE_NAME}"
+          echo "🔧 Go version: ${GO_VERSION}"
 
-    - name: Verify binary
-      run: |
-        file sysdwitch
-        ./sysdwitch -h 2>/dev/null || echo "Binary built successfully (no help flag)"
+          # Extract version from tag (remove 'v' prefix if present)
+          VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${VERSION#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
 
-    - name: Rename binary for release
-      run: |
-        # Rename binary with version and architecture for clear release naming
-        mv sysdwitch sysdwitch-${{ steps.get_version.outputs.version }}-${{ matrix.arch }}-linux
+          echo "binary_name=${MODULE_NAME}-${VERSION}" >> $GITHUB_OUTPUT
 
-    - name: Upload release assets
-      uses: softprops/action-gh-release@v2
-      with:
-        files: |
-          sysdwitch-${{ steps.get_version.outputs.version }}-${{ matrix.arch }}-linux
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.meta.outputs.go_version }}
+
+      - name: Build binaries for Linux platforms
+        run: |
+          mkdir -p bin
+          BINARY_NAME="${{ steps.meta.outputs.binary_name }}"
+          MAIN_PACKAGE="./cmd/${{ steps.meta.outputs.module_name }}"
+          VERSION="${{ steps.meta.outputs.version }}"
+          LDFLAGS="-w -s -X main.version=${VERSION} -X main.commit=${GITHUB_SHA} -X main.buildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          echo "Building binary ${BINARY_NAME} for version ${VERSION}..."
+          echo "Building for Linux AMD64..."
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o bin/${BINARY_NAME}-linux-amd64 ${MAIN_PACKAGE}
+          echo "Building for Linux ARM64..."
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o bin/${BINARY_NAME}-linux-arm64 ${MAIN_PACKAGE}
+
+      - name: Verify binaries
+        run: |
+          echo "Verifying built binaries..."
+          cd bin
+          BINARY_NAME="${{ steps.meta.outputs.binary_name }}"
+
+          # Test Linux binaries
+          echo "Testing Linux AMD64 binary..."
+          file ${BINARY_NAME}-linux-amd64
+          timeout 5s ./${BINARY_NAME}-linux-amd64 --version || echo "Binary verification failed"
+
+          echo "Testing Linux ARM64 binary..."
+          file ${BINARY_NAME}-linux-arm64
+          timeout 5s ./${BINARY_NAME}-linux-arm64 --version || echo "Binary verification failed"
+
+          echo "✅ All binaries verified successfully"
+
+      - name: Create SHA256 checksums
+        run: |
+          cd bin
+          sha256sum * > checksums.sha256
+          cat checksums.sha256
+
+      - name: Generate release notes
+        run: |
+          echo "## Changes" > release_notes.md
+          echo "" >> release_notes.md
+          # Get commits since last tag or show recent commits
+          if git describe --tags --abbrev=0 HEAD~1 >/dev/null 2>&1; then
+            git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 HEAD~1)..HEAD >> release_notes.md
+          else
+            git log --oneline -10 >> release_notes.md
+          fi
+          echo "" >> release_notes.md
+          echo "## Downloads" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "Pre-built binaries are available for the following Linux platforms:" >> release_notes.md
+          echo "- Linux AMD64" >> release_notes.md
+          echo "- Linux ARM64" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "Binaries include SHA256 checksums for verification." >> release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            bin/${{ steps.meta.outputs.binary_name }}-linux-amd64
+            bin/${{ steps.meta.outputs.binary_name }}-linux-arm64
+            bin/checksums.sha256
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
