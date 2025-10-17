@@ -48,10 +48,15 @@ jobs:
         file sysdwitch
         ./sysdwitch -h 2>/dev/null || echo "Binary built successfully (no help flag)"
 
+    - name: Rename binary for release
+      run: |
+        # Rename binary with version and architecture for clear release naming
+        mv sysdwitch sysdwitch-${{ steps.get_version.outputs.version }}-${{ matrix.arch }}-linux
+
     - name: Generate checksums
       run: |
         # Generate SHA256 checksums for verification
-        sha256sum sysdwitch > sysdwitch-${{ steps.get_version.outputs.version }}-${{ matrix.arch }}-linux.sha256
+        sha256sum sysdwitch-${{ steps.get_version.outputs.version }}-${{ matrix.arch }}-linux > sysdwitch-${{ steps.get_version.outputs.version }}-${{ matrix.arch }}-linux.sha256
 
     - name: Create source archives
       if: matrix.arch == 'amd64'  # Only create once, not per architecture
@@ -65,7 +70,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          sysdwitch#sysdwitch-${{ steps.get_version.outputs.version }}-${{ matrix.arch }}-linux
+          sysdwitch-${{ steps.get_version.outputs.version }}-${{ matrix.arch }}-linux
           sysdwitch-${{ steps.get_version.outputs.version }}-${{ matrix.arch }}-linux.sha256
           ${{ matrix.arch == 'amd64' && format('sysdwitch-{0}-source.tar.gz', steps.get_version.outputs.version) || '' }}
           ${{ matrix.arch == 'amd64' && format('sysdwitch-{0}-source.zip', steps.get_version.outputs.version) || '' }}
