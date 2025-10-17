@@ -4,7 +4,7 @@
 *.dll
 *.so
 *.dylib
-service-control
+service-control$
 service-control_unix
 service-control-*
 
