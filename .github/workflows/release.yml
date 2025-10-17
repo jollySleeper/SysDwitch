@@ -39,7 +39,7 @@ jobs:
         CGO_ENABLED=0 GOOS=linux GOARCH=${{ matrix.arch }} go build \
           -ldflags="-w -s -X main.version=${{ steps.get_version.outputs.version }} -X main.commit=${GITHUB_SHA} -X main.buildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
           -o service-control-panel \
-          ./cmd/service-control/
+          ./cmd/server/
 
     - name: Verify binary
       run: |

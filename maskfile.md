@@ -5,7 +5,7 @@
 Build the application binary.
 
 ```bash
-go build -o service-control -v ./cmd/service-control
+go build -o service-control -v ./cmd/server
 ```
 
 ## build-linux
@@ -13,7 +13,7 @@ go build -o service-control -v ./cmd/service-control
 Build for Linux (cross-compilation).
 
 ```bash
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o service-control-linux-amd64 -v ./cmd/service-control
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o service-control-linux-amd64 -v ./cmd/server
 ```
 
 ## build-all
@@ -21,9 +21,9 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o service-control-linux-amd64 -v
 Build for multiple platforms.
 
 ```bash
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o service-control-linux-amd64 ./cmd/service-control
-CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o service-control-darwin-amd64 ./cmd/service-control
-CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o service-control-windows-amd64.exe ./cmd/service-control
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o service-control-linux-amd64 ./cmd/server
+CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o service-control-darwin-amd64 ./cmd/server
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o service-control-windows-amd64.exe ./cmd/server
 ```
 
 ## test
@@ -48,7 +48,7 @@ go tool cover -html=coverage.out -o coverage.html
 Build and run the application.
 
 ```bash
-go build -o service-control -v ./cmd/service-control
+go build -o service-control -v ./cmd/server
 ./service-control
 ```
 
