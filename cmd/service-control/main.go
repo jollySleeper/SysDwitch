@@ -24,6 +24,13 @@ import (
 	"service-control-panel/web"
 )
 
+// Version information - set at build time
+var (
+	version   = "dev"
+	commit    = "unknown"
+	buildTime = "unknown"
+)
+
 // AppConfig holds application configuration
 type AppConfig struct {
 	Host            string        `json:"host"`
@@ -38,13 +45,23 @@ type AppConfig struct {
 // loadConfig loads configuration from environment variables and flags
 func loadConfig() (*AppConfig, error) {
 	var config AppConfig
+	var showVersion bool
 
 	// Command line flags
 	flag.StringVar(&config.Host, "host", getEnvOrDefault("HOST", "127.0.0.1"), "server host")
 	flag.IntVar(&config.Port, "port", getEnvIntOrDefault("PORT", 8081), "server port")
+	flag.BoolVar(&showVersion, "version", false, "show version information")
 
 	// Parse flags
 	flag.Parse()
+
+	// Handle version flag
+	if showVersion {
+		fmt.Printf("Service Control Panel %s\n", version)
+		fmt.Printf("Commit: %s\n", commit)
+		fmt.Printf("Built: %s\n", buildTime)
+		os.Exit(0)
+	}
 
 	// Get allowed services from environment
 	allowedServicesStr := getEnvOrDefault("ALLOWED_SERVICES", "calibre.service,jellyfin.service,navidrome.service")
