@@ -290,9 +290,9 @@ func getClientIP(r *http.Request) string {
 // cacheControlMiddleware adds appropriate caching headers for static assets
 func cacheControlMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Add aggressive caching for static assets (1 year)
+		// Add caching for static assets (1 day)
 		// These are embedded in the binary, so they won't change without a redeploy
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		w.Header().Set("Cache-Control", "public, max-age=86400, immutable")
 		next.ServeHTTP(w, r)
 	})
 }
