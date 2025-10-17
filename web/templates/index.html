@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Service Control Panel</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto px-4 py-8">
@@ -39,67 +40,6 @@
         </div>
     </div>
 
-    <script>
-        // JavaScript for dynamic service management
-        async function loadServices() {
-            try {
-                const response = await fetch('/api/services/status');
-                const data = await response.json();
-                if (data.services) {
-                    renderServices(data.services);
-                }
-            } catch (error) {
-                console.error('Failed to load services:', error);
-            }
-        }
-
-        function renderServices(services) {
-            const grid = document.getElementById('services-grid');
-            grid.innerHTML = services.map(service => `
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold">${service.name.replace('.service', '')}</h3>
-                        <span class="px-2 py-1 rounded-full text-sm ${service.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                            ${service.status}
-                        </span>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="controlService('${service.name.replace('.service', '')}', 'start')"
-                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded ${service.active ? 'opacity-50 cursor-not-allowed' : ''}"
-                                ${service.active ? 'disabled' : ''}>
-                            Start
-                        </button>
-                        <button onclick="controlService('${service.name.replace('.service', '')}', 'stop')"
-                                class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded ${!service.active ? 'opacity-50 cursor-not-allowed' : ''}"
-                                ${!service.active ? 'disabled' : ''}>
-                            Stop
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        async function controlService(serviceName, action) {
-            try {
-                const response = await fetch(`/api/services/${serviceName}/${action}`, {
-                    method: 'POST'
-                });
-                const result = await response.json();
-                if (result.success) {
-                    loadServices(); // Refresh the display
-                } else {
-                    alert('Operation failed: ' + (result.error || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Control service error:', error);
-                alert('Operation failed');
-            }
-        }
-
-        // Load services on page load
-        loadServices();
-        // Refresh every 30 seconds
-        setInterval(loadServices, 30000);
-    </script>
+    <script src="/static/js/app.js"></script>
 </body>
 </html>
