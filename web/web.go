@@ -7,5 +7,5 @@ import (
 //go:embed templates/index.html
 var TemplatesFS embed.FS
 
-//go:embed static/*
+//go:embed static/css static/js
 var StaticFS embed.FS

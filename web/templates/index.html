@@ -15,28 +15,14 @@
         </header>
 
         <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3" id="services-grid">
-            {{range .Services}}
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-semibold">{{.Name | trimSuffix ".service"}}</h3>
-                    <span class="px-2 py-1 rounded-full text-sm {{if .Active}}bg-green-100 text-green-800{{else}}bg-red-100 text-red-800{{end}}">
-                        {{.Status}}
-                    </span>
+            <!-- Services will be loaded dynamically by JavaScript -->
+            <div class="col-span-full text-center py-8">
+                <div class="animate-pulse">
+                    <div class="h-4 bg-gray-200 rounded w-1/4 mx-auto mb-4"></div>
+                    <div class="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
                 </div>
-                <div class="flex gap-2">
-                    <button onclick="controlService('{{.Name | trimSuffix ".service"}}', 'start')"
-                            class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded {{if .Active}}opacity-50 cursor-not-allowed{{end}}"
-                            {{if .Active}}disabled{{end}}>
-                        Start
-                    </button>
-                    <button onclick="controlService('{{.Name | trimSuffix ".service"}}', 'stop')"
-                            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded {{if not .Active}}opacity-50 cursor-not-allowed{{end}}"
-                            {{if not .Active}}disabled{{end}}>
-                        Stop
-                    </button>
-                </div>
+                <p class="text-gray-500 mt-4">Loading services...</p>
             </div>
-            {{end}}
         </div>
     </div>
 
