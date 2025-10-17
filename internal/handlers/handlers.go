@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"strings"
 
-	"service-control-panel/internal/auth"
-	"service-control-panel/internal/service"
+	"sysdwitch/internal/auth"
+	"sysdwitch/internal/service"
 )
 
 // Handler holds dependencies for HTTP handlers

@@ -5,7 +5,7 @@
 Build the application binary.
 
 ```bash
-go build -o service-control -v ./cmd/server
+go build -o sysdwitch -v ./cmd/sysdwitch
 ```
 
 ## build-linux
@@ -13,7 +13,7 @@ go build -o service-control -v ./cmd/server
 Build for Linux (cross-compilation).
 
 ```bash
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o service-control-linux-amd64 -v ./cmd/server
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o sysdwitch-linux-amd64 -v ./cmd/sysdwitch
 ```
 
 ## build-all
@@ -21,9 +21,9 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o service-control-linux-amd64 -v
 Build for multiple platforms.
 
 ```bash
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o service-control-linux-amd64 ./cmd/server
-CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o service-control-darwin-amd64 ./cmd/server
-CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o service-control-windows-amd64.exe ./cmd/server
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o sysdwitch-linux-amd64 ./cmd/sysdwitch
+CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o sysdwitch-darwin-amd64 ./cmd/sysdwitch
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o sysdwitch-windows-amd64.exe ./cmd/sysdwitch
 ```
 
 ## test
@@ -48,7 +48,7 @@ go tool cover -html=coverage.out -o coverage.html
 Build and run the application.
 
 ```bash
-go build -o service-control -v ./cmd/server
+go build -o sysdwitch -v ./cmd/sysdwitch
 ./service-control
 ```
 

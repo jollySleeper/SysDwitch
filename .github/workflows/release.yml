@@ -38,24 +38,24 @@ jobs:
         # Build statically linked binary for Linux
         CGO_ENABLED=0 GOOS=linux GOARCH=${{ matrix.arch }} go build \
           -ldflags="-w -s -X main.version=${{ steps.get_version.outputs.version }} -X main.commit=${GITHUB_SHA} -X main.buildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-          -o service-control-panel \
-          ./cmd/server/
+          -o sysdwitch \
+          ./cmd/sysdwitch/
 
     - name: Verify binary
       run: |
-        file service-control-panel
-        ./service-control-panel -h 2>/dev/null || echo "Binary built successfully (no help flag)"
+        file sysdwitch
+        ./sysdwitch -h 2>/dev/null || echo "Binary built successfully (no help flag)"
 
     - name: Create release archive
       run: |
         # Create a tar.gz archive with the binary
-        tar -czf service-control-panel-${{ steps.get_version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz service-control-panel
-        ls -la service-control-panel*
+        tar -czf sysdwitch-${{ steps.get_version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz sysdwitch
+        ls -la sysdwitch*
 
     - name: Upload release assets
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          service-control-panel-${{ steps.get_version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz
+          sysdwitch-${{ steps.get_version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

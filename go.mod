@@ -1,3 +1,3 @@
-module service-control-panel
+module sysdwitch
 
 go 1.25

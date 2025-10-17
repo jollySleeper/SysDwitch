@@ -18,10 +18,10 @@ import (
 	"syscall"
 	"time"
 
-	"service-control-panel/internal/auth"
-	"service-control-panel/internal/handlers"
-	"service-control-panel/internal/service"
-	"service-control-panel/web"
+	"sysdwitch/internal/auth"
+	"sysdwitch/internal/handlers"
+	"sysdwitch/internal/service"
+	"sysdwitch/web"
 )
 
 // Version information - set at build time
