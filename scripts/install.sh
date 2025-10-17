@@ -34,6 +34,6 @@ sudo nginx -t && sudo systemctl reload nginx
 echo "Installation complete!"
 echo "1. Edit environments/local.env with your admin credentials"
 echo "2. Start with: systemctl --user start sysdwitch"
-echo "3. Access at: https://service-control.aevion.lan"
+echo "3. Access at: http://yourdomain.com"
 echo ""
 echo "To update: git pull && make build && systemctl --user restart sysdwitch"
