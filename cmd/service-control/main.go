@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"html/template"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -143,6 +144,10 @@ func main() {
 
 		ctx := r.Context()
 		services := serviceManager.GetAllServicesStatus(ctx)
+		logger.Info("rendering dashboard", "service_count", len(services))
+		for i, svc := range services {
+			logger.Info("service data", "index", i, "name", svc.Name, "status", svc.Status, "active", svc.Active)
+		}
 		data := struct {
 			Services []service.ServiceStatus
 		}{
@@ -236,14 +241,13 @@ func main() {
 		}
 	}))
 
-	// TODO: Add static file serving when static assets are added
 	// Static files from embedded FS
-	// staticFS, err := fs.Sub(embeddedFiles, "web/static")
-	// if err != nil {
-	//     logger.Error("failed to create static file subsystem", "error", err)
-	//     os.Exit(1)
-	// }
-	// mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+	staticFS, err := fs.Sub(web.StaticFS, "static")
+	if err != nil {
+		logger.Error("failed to create static file subsystem", "error", err)
+		os.Exit(1)
+	}
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
 	// Security headers middleware
 	secureMux := securityHeadersMiddleware(mux)

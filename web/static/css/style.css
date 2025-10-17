@@ -1,0 +1,10 @@
+/* Service Control Panel Custom Styles */
+/* This file can be used for additional custom styling beyond TailwindCSS */
+
+.service-card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.service-card:hover {
+    transform: translateY(-2px);
+}
