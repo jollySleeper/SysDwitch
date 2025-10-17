@@ -22,18 +22,18 @@ echo "Please edit configs/environments/local.env with your settings"
 
 # Install systemd service
 mkdir -p ~/.config/systemd/user
-cp configs/systemd/service-control.service ~/.config/systemd/user/
+cp init/sysdwitch.service ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable service-control
+systemctl --user enable sysdwitch
 
 # Install nginx config
-sudo cp configs/nginx/sites/service-control.conf /etc/nginx/sites-available/
-sudo ln -sf /etc/nginx/sites-available/service-control.conf /etc/nginx/sites-enabled/
+sudo cp configs/nginx/sites/sysdwitch.conf /etc/nginx/sites-available/
+sudo ln -sf /etc/nginx/sites-available/sysdwitch.conf /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 
 echo "Installation complete!"
 echo "1. Edit environments/local.env with your admin credentials"
-echo "2. Start with: systemctl --user start service-control"
+echo "2. Start with: systemctl --user start sysdwitch"
 echo "3. Access at: https://service-control.aevion.lan"
 echo ""
-echo "To update: git pull && make build && systemctl --user restart service-control"
+echo "To update: git pull && make build && systemctl --user restart sysdwitch"

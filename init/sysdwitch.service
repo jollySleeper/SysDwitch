@@ -1,0 +1,23 @@
+[Unit]
+Description=SystemD Switch (sysdwitch)
+After=network.target
+
+[Service]
+Type=simple
+User=%u
+WorkingDirectory=%h/selfhost/apps/sysdwitch
+ExecStart=%h/selfhost/apps/sysdwitch/sysdwitch
+Restart=always
+RestartSec=5
+
+# Environment
+EnvironmentFile=%h/selfhost/apps/sysdwitch/configs/environments/local.env
+
+# Security
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=%h/selfhost
+
+[Install]
+WantedBy=default.target
